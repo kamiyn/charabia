@@ -14,15 +14,25 @@ static LINDERA: Lazy<Tokenizer> = Lazy::new(|| {
     #[cfg(all(feature = "japanese-segmentation-ipadic", feature = "japanese-segmentation-unidic"))]
     compile_error!("Feature japanese-segmentation-ipadic and japanese-segmentation-unidic are mutually exclusive and cannot be enabled together");
 
+    fn user_dictionary(kind: DictionaryKind) -> Option<lindera::UserDictionaryConfig> {
+        let user_dictionary_path = std::env::var("CHARABIA_JAPANESE_USER_DICTIONARY").ok()?;
+        let pathbuf = std::path::PathBuf::from(user_dictionary_path);
+        Some(lindera::UserDictionaryConfig { kind: Some(kind), path: pathbuf })
+        // ここの責務は config の構築であり pathbuf.is_file() 等による存在確認はしない
+        // ファイルの存在・ファイルの中身の形式確認と、結果としてエラーが発生した場合のエラーの伝播は user_dictionary を使う時点の課題
+    }
+
     #[cfg(feature = "japanese-segmentation-ipadic")]
     let config = TokenizerConfig {
         dictionary: DictionaryConfig { kind: Some(DictionaryKind::IPADIC), path: None },
+        user_dictionary: user_dictionary(DictionaryKind::IPADIC),
         mode: Mode::Decompose(Penalty::default()),
         ..TokenizerConfig::default()
     };
     #[cfg(feature = "japanese-segmentation-unidic")]
     let config = TokenizerConfig {
         dictionary: DictionaryConfig { kind: Some(DictionaryKind::UniDic), path: None },
+        user_dictionary: user_dictionary(DictionaryKind::UniDic),
         mode: Mode::Normal,
         ..TokenizerConfig::default()
     };
