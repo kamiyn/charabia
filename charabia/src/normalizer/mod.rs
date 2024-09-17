@@ -17,10 +17,14 @@ use self::nonspacing_mark::NonspacingMarkNormalizer;
 use self::quote::QuoteNormalizer;
 #[cfg(feature = "swedish-recomposition")]
 use self::swedish_recomposition::SwedishRecompositionNormalizer;
+#[cfg(feature = "turkish")]
+pub use self::turkish::TurkishNormalizer;
 #[cfg(feature = "vietnamese")]
 pub use self::vietnamese::VietnameseNormalizer;
 use crate::segmenter::SegmentedTokenIter;
 use crate::Token;
+
+pub use self::ae_oe_normalizer::AeOeNormalizer;
 
 mod arabic;
 #[cfg(feature = "chinese-normalization")]
@@ -37,8 +41,12 @@ mod nonspacing_mark;
 mod quote;
 #[cfg(feature = "swedish-recomposition")]
 mod swedish_recomposition;
+#[cfg(feature = "turkish")]
+mod turkish;
 #[cfg(feature = "vietnamese")]
 mod vietnamese;
+
+mod ae_oe_normalizer;
 
 /// List of [`Normalizer`]s used by [`Normalize::normalize`] that are not considered lossy.
 pub static NORMALIZERS: Lazy<Vec<Box<dyn Normalizer>>> = Lazy::new(|| {
@@ -56,6 +64,7 @@ pub static LOSSY_NORMALIZERS: Lazy<Vec<Box<dyn Normalizer>>> = Lazy::new(|| {
     vec![
         Box::new(LowercaseNormalizer),
         Box::new(QuoteNormalizer),
+        Box::new(AeOeNormalizer),
         #[cfg(feature = "chinese-normalization")]
         Box::new(ChineseNormalizer),
         #[cfg(feature = "japanese-transliteration")]
@@ -66,6 +75,8 @@ pub static LOSSY_NORMALIZERS: Lazy<Vec<Box<dyn Normalizer>>> = Lazy::new(|| {
         Box::new(NonspacingMarkNormalizer),
         #[cfg(feature = "vietnamese")]
         Box::new(VietnameseNormalizer),
+        #[cfg(feature = "turkish")]
+        Box::new(TurkishNormalizer),
     ]
 });
 
@@ -76,12 +87,12 @@ pub(crate) const DEFAULT_NORMALIZER_OPTION: NormalizerOption = NormalizerOption 
 };
 
 /// Iterator over Normalized [`Token`]s.
-pub struct NormalizedTokenIter<'o, 'tb> {
-    token_iter: SegmentedTokenIter<'o, 'tb>,
+pub struct NormalizedTokenIter<'o, 'aho, 'lang, 'tb> {
+    token_iter: SegmentedTokenIter<'o, 'aho, 'lang>,
     options: &'tb NormalizerOption<'tb>,
 }
 
-impl<'o> Iterator for NormalizedTokenIter<'o, '_> {
+impl<'o> Iterator for NormalizedTokenIter<'o, '_, '_, '_> {
     type Item = Token<'o>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -227,11 +238,14 @@ impl From<String> for CharOrStr {
     }
 }
 
-impl<'o, 'tb> SegmentedTokenIter<'o, 'tb> {
+impl<'o, 'aho, 'lang> SegmentedTokenIter<'o, 'aho, 'lang> {
     /// Normalize [`Token`]s using all the compatible Normalizers.
     ///
     /// A Latin `Token` would not be normalized the same as a Chinese `Token`.
-    pub fn normalize(self, options: &'tb NormalizerOption<'tb>) -> NormalizedTokenIter<'o, 'tb> {
+    pub fn normalize<'tb>(
+        self,
+        options: &'tb NormalizerOption<'tb>,
+    ) -> NormalizedTokenIter<'o, 'aho, 'lang, 'tb> {
         NormalizedTokenIter { token_iter: self, options }
     }
 }
